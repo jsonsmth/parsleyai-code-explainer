@@ -2,8 +2,10 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
-dotenv.config();
 import cors from 'cors';
+import validator from 'validator';
+
+dotenv.config();
 
 const app = express();
 app.use(bodyParser.json());
@@ -11,6 +13,21 @@ app.use(cors({
   origin: '*'
 }));
 
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    //console.error('Bad JSON input:', err);
+    const errorMessage = 'Invalid input. Please provide a valid code snippet.';
+
+    const responseObj = {
+      explanation: errorMessage,
+      rateLimit: {}
+    };
+
+    res.status(400).json(responseObj);
+  } else {
+    next(err);
+  }
+});
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_URL = 'https://api.openai.com/v1/completions';
@@ -18,7 +35,25 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/completions';
 app.options('/api/interpret-code', cors());
 
 app.post('/api/interpret-code', async (req, res) => {
-  const codeSnippet = req.body.codeSnippet;
+
+  if (!req.body || !req.body.hasOwnProperty("codeSnippet")) {
+    return res.status(400).json({
+      error: 'Invalid request: Please provide a valid code snippet',
+      rateLimit: {},
+    });
+  }
+
+  let codeSnippet = req.body.codeSnippet;
+  codeSnippet = validator.escape(codeSnippet);
+
+  if (!validator.isLength(codeSnippet, { min: 1 })) {
+    const errorMessage = 'Invalid input. Please provide a valid code snippet.';
+    res.status(400).json({
+      explanation: errorMessage,
+      rateLimit: {}
+    });
+    return;
+  }
 
   try {
     const response = await fetch(OPENAI_API_URL, {
