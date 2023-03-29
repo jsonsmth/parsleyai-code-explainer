@@ -15,7 +15,6 @@ app.use(cors({
 
 app.use((err, req, res, next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    //console.error('Bad JSON input:', err);
     const errorMessage = 'Invalid input. Please provide a valid code snippet.';
 
     const responseObj = {
@@ -37,8 +36,9 @@ app.options('/api/interpret-code', cors());
 app.post('/api/interpret-code', async (req, res) => {
 
   if (!req.body || !req.body.hasOwnProperty("codeSnippet")) {
-    return res.status(400).json({
-      error: 'Invalid request: Please provide a valid code snippet',
+    const errorMessage = 'Invalid input. Please provide a valid code snippet.';
+    return res.status(200).json({
+      explanation: errorMessage,
       rateLimit: {},
     });
   }
@@ -48,7 +48,7 @@ app.post('/api/interpret-code', async (req, res) => {
 
   if (!validator.isLength(codeSnippet, { min: 1 })) {
     const errorMessage = 'Invalid input. Please provide a valid code snippet.';
-    res.status(400).json({
+    res.status(200).json({
       explanation: errorMessage,
       rateLimit: {}
     });
@@ -70,6 +70,15 @@ app.post('/api/interpret-code', async (req, res) => {
         'top_p': 1
       })
     });
+
+    if (!response.ok) {
+      const errorMessage = 'Error in OpenAI API Call. Please try again.';
+      res.status(200).json({
+        explanation: errorMessage,
+        rateLimit: {}
+      });
+      return;
+    }
 
     const data = await response.json();
     const headers = response.headers.raw();
